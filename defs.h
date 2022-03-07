@@ -9,6 +9,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct pstat;
 
 // bio.c
 void            binit(void);
@@ -120,6 +121,8 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+uint            rand();
+struct proc*    hold_lottery(int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

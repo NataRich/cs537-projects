@@ -6,6 +6,13 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#define RAND_MAX 0x7fffffff
+uint rseed = 0;
+
+// https://rosettacode.org/wiki/Linear_congruential_generator
+uint rand() {
+    return rseed = (rseed * 1103515245 + 12345) & RAND_MAX;
+}
 
 struct {
   struct spinlock lock;
@@ -64,11 +71,49 @@ myproc(void) {
   popcli();
   return p;
 }
+//find a process by its pid, return 0 if not found
+struct proc*
+findproc(int pid) {
+  struct proc* p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if(p->pid == pid) {
+      return p;
+    }
+  }
+  release(&ptable.lock);
+  return 0;
+}
+void
+pinfo(struct pstat* ps) {
+  struct proc* p;
+  acquire(&ptable.lock);
+  int i = 0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    if(p->state == UNUSED) {//make everything 0
+      ps->inuse[i] = 0;
+      ps->pid[i] = 0;
+      ps->tickets[i] = 0;
+      ps->runticks[i] = 0;
+      ps->boostsleft[i] = 0;
+      i++;
+    } else {//fill in the corresponding data
+      ps->inuse[i] = 1;
+      ps->pid[i] = p->pid;
+      ps->tickets[i] = p->ticket;
+      ps->runticks[i] = p->nrun;
+      ps->boostsleft[i] = p->boostcount;
+      i++;
+    }
+  }    
+  release(&ptable.lock);
+  
+}
 
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
 // If found, change state to EMBRYO and initialize
-// state required to run in the kernel.
+// state required to run in the kernl.
 // Otherwise return 0.
 static struct proc*
 allocproc(void)
@@ -88,7 +133,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->ticket = 1;
+  p->boostcount = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -199,7 +245,8 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-
+  np->ticket = curproc->ticket;
+  np->boostcount = 0;
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -319,6 +366,41 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+int totaltickets(void) {
+  struct proc* p;
+  int count = 0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == RUNNABLE) {
+      count = count + p->ticket;//may need some change in the future
+    }
+  }
+  return count;
+}
+// returns a pointer to the lottery winner.
+struct proc *hold_lottery(int total_tickets) {
+    if (total_tickets <= 0) {
+        cprintf("this function should only be called when at least 1 process is RUNNABLE");
+        return 0;
+    }
+
+    uint random_number = rand();    // This number is between 0->4 billion
+    uint winner_ticket_number = random_number % (total_tickets+1);
+    // Ensure that it is less than total number of tickets.
+    // pick the winning process from ptable.
+    struct proc* p;
+    uint counter = 0;
+    //acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+            continue;
+        counter = counter + p->ticket;
+        if (counter > winner_ticket_number)
+            break;
+    }
+    //release(&ptable.lock); 
+    // return winner.
+    return p;
+}
 void
 scheduler(void)
 {
@@ -332,6 +414,18 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    int totaltic = totaltickets();
+    p = hold_lottery(totaltic);
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    /*
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
@@ -350,6 +444,7 @@ scheduler(void)
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
+    */
     release(&ptable.lock);
 
   }
