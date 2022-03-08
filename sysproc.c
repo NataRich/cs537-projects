@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "pstat.h"
 
 int
 sys_fork(void)
@@ -64,6 +65,8 @@ sys_sleep(void)
 
   if(argint(0, &n) < 0)
     return -1;
+  myproc()->sleepticks = n;
+  myproc()->boostcount = myproc()->boostcount + n;
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
@@ -71,6 +74,7 @@ sys_sleep(void)
       release(&tickslock);
       return -1;
     }
+    myproc()->sleepticks--;
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
@@ -110,11 +114,12 @@ void
 sys_srand(void)//(uint seed)
 {
   extern uint rseed;
-  uint seed;
+  int seed;
+  
   if (argint(0, &seed) < 0) {
     return;
   }
-  rseed = seed;
+  rseed = (uint) seed;
 }
 int
 sys_getpinfo(void)//(struct pstat *)

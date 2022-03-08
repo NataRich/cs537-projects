@@ -51,6 +51,7 @@ struct proc {
   char name[16];               // Process name (debugging)
   int ticket;
   int nrun;                    //number of scheduled timer ticks
+  int sleepticks;              //number of ticks it should sleep, -1 when a tick passed
   int boostcount;
 };
 

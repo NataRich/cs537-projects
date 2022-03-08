@@ -104,6 +104,7 @@ int             pipewrite(struct pipe*, char*, int);
 
 //PAGEBREAK: 16
 // proc.c
+uint            rand();
 int             cpuid(void);
 void            exit(void);
 int             fork(void);
@@ -111,8 +112,12 @@ int             growproc(int);
 int             kill(int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
+struct proc*    findproc(int);
+void            pinfo(struct pstat*);
 void            pinit(void);
 void            procdump(void);
+int             totaltickets(void);
+struct proc*    hold_lottery(int);
 void            scheduler(void) __attribute__((noreturn));
 void            sched(void);
 void            setproc(struct proc*);

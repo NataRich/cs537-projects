@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 #define RAND_MAX 0x7fffffff
 uint rseed = 0;
 
@@ -134,6 +135,8 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
   p->ticket = 1;
+  p->nrun = 0;
+  p->sleepticks = 0;
   p->boostcount = 0;
   release(&ptable.lock);
 
@@ -247,6 +250,8 @@ fork(void)
   *np->tf = *curproc->tf;
   np->ticket = curproc->ticket;
   np->boostcount = 0;
+  np->sleepticks = 0;
+  np->nrun = 0;
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -371,7 +376,10 @@ int totaltickets(void) {
   int count = 0;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->state == RUNNABLE) {
-      count = count + p->ticket;//may need some change in the future
+      if (p->boostcount == 0)
+        count = count + p->ticket;
+      else
+        count = count + p->ticket * 2;
     }
   }
   return count;
@@ -393,7 +401,12 @@ struct proc *hold_lottery(int total_tickets) {
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
         if(p->state != RUNNABLE)
             continue;
-        counter = counter + p->ticket;
+        int actualticket = p->ticket;
+        if (p->boostcount > 0) {//double its ticket but not in proc struct
+            actualticket *= 2;
+            p->boostcount--;
+        }
+        counter = counter + actualticket;
         if (counter > winner_ticket_number)
             break;
     }
@@ -419,7 +432,7 @@ scheduler(void)
     c->proc = p;
     switchuvm(p);
     p->state = RUNNING;
-
+    p->nrun++;
     swtch(&(c->scheduler), p->context);
     switchkvm();
     // Process is done running for now.
@@ -555,7 +568,7 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan && p->sleepticks == 0)
       p->state = RUNNABLE;
 }
 
