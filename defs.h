@@ -112,7 +112,7 @@ int             growproc(int);
 int             kill(int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
-struct proc*    findproc(int);
+int             findproc(int, int);
 void            pinfo(struct pstat*);
 void            pinit(void);
 void            procdump(void);

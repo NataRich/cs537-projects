@@ -73,17 +73,20 @@ myproc(void) {
   return p;
 }
 //find a process by its pid, return 0 if not found
-struct proc*
-findproc(int pid) {
+int
+findproc(int pid, int ticket) {
   struct proc* p;
-  acquire(&ptable.lock);
+  //acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     if(p->pid == pid) {
-      return p;
+      acquire(&ptable.lock);
+      p->ticket = ticket;
+      release(&ptable.lock);
+      return 0;
     }
   }
-  release(&ptable.lock);
-  return 0;
+  //release(&ptable.lock);
+  return -1;
 }
 void
 pinfo(struct pstat* ps) {
@@ -134,10 +137,10 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->ticket = 1;
-  p->nrun = 0;
-  p->sleepticks = 0;
-  p->boostcount = 0;
+  //p->ticket = 1;
+  //p->nrun = 0;
+  //p->sleepticks = 0;
+  //p->boostcount = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -160,7 +163,10 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-
+  p->ticket = 1;
+  p->nrun = 0;
+  p->sleepticks = 0;
+  p->boostcount = 0;
   return p;
 }
 
@@ -173,7 +179,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
-  
+  //p->ticket = 1;
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
@@ -249,9 +255,9 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
   np->ticket = curproc->ticket;
-  np->boostcount = 0;
-  np->sleepticks = 0;
-  np->nrun = 0;
+  //np->boostcount = 0;
+  //np->sleepticks = 0;
+  //np->nrun = 0;
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -395,7 +401,7 @@ struct proc *hold_lottery(int total_tickets) {
     uint winner_ticket_number = random_number % (total_tickets+1);
     // Ensure that it is less than total number of tickets.
     // pick the winning process from ptable.
-    struct proc* p;
+    struct proc* p,*q;
     uint counter = 0;
     //acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -404,11 +410,15 @@ struct proc *hold_lottery(int total_tickets) {
         int actualticket = p->ticket;
         if (p->boostcount > 0) {//double its ticket but not in proc struct
             actualticket *= 2;
-            p->boostcount--;
+            //p->boostcount--;
         }
         counter = counter + actualticket;
         if (counter >= winner_ticket_number)
             break;
+    }
+    for(q = ptable.proc; q < &ptable.proc[NPROC]; q++){
+      if (q->state == RUNNABLE && q->boostcount > 0)
+        q->boostcount--;
     }
     //release(&ptable.lock); 
     // return winner.
@@ -572,8 +582,14 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan && p->sleepticks == 0)
-      p->state = RUNNABLE;
+    if(p->state == SLEEPING) {
+      p->sleepticks--;
+      p->boostcount++;
+      if (p->chan == chan && p->sleepticks <= 0) {
+       p->state = RUNNABLE;
+       p->sleepticks = 0;
+      }
+    }
 }
 
 // Wake up all processes sleeping on chan.

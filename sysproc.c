@@ -61,13 +61,14 @@ int
 sys_sleep(void)
 {
   int n;
-  uint ticks0;
+  //uint ticks0;
 
   if(argint(0, &n) < 0)
     return -1;
-  myproc()->sleepticks = n;
-  myproc()->boostcount = myproc()->boostcount + n;
   acquire(&tickslock);
+  myproc()->sleepticks = n;
+  //myproc()->boostcount = myproc()->boostcount + n;
+  /*
   ticks0 = ticks;
   while(ticks - ticks0 < n){
     if(myproc()->killed){
@@ -77,6 +78,8 @@ sys_sleep(void)
     myproc()->sleepticks--;
     sleep(&ticks, &tickslock);
   }
+  */
+  sleep(&ticks,&tickslock);
   release(&tickslock);
   return 0;
 }
@@ -101,11 +104,14 @@ sys_settickets(void)//(int pid, int n_tickets)
   if (argint(0,&pid) < 0 || argint(1,&ntickets) < 0)
     return -1;
   //add a funciton in proc.c to search through ptable for pid
-  struct proc* p = findproc(pid);
-  if (p == 0) {
+  if (pid < 0 || ntickets <= 0)
+    return -1;
+  
+  int p = findproc(pid, ntickets);
+  if (p == -1) {
     return -1;
   } else {
-    p->ticket = ntickets;
+    //p->ticket = ntickets;
     return 0;
   } 
 }
