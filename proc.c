@@ -407,7 +407,7 @@ struct proc *hold_lottery(int total_tickets) {
             p->boostcount--;
         }
         counter = counter + actualticket;
-        if (counter > winner_ticket_number)
+        if (counter >= winner_ticket_number)
             break;
     }
     //release(&ptable.lock); 
@@ -428,6 +428,10 @@ scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     int totaltic = totaltickets();
+    if (totaltic == 0) {
+      release(&ptable.lock);
+      continue;
+    }
     p = hold_lottery(totaltic);
     c->proc = p;
     switchuvm(p);
