@@ -31,15 +31,7 @@ void* LinkedListFind(LinkedList* list, const char* key)
 
     // Key present
     if (curr != NULL)
-    {
-        val = malloc(curr->val_size);
-        if (val == NULL)
-        {
-            printf("ERROR: malloc failed (linkedlist.find.1).\n");
-            exit(1);
-        }
-        memcpy(val, curr->val, curr->val_size);
-    }
+        val = curr->val;
     pthread_rwlock_unlock(&list->lock);
     return val;
 }
@@ -61,7 +53,6 @@ static void LinkedListAddToHead(LinkedList* list, const char* key,
         exit(1);
     }
     memcpy(new_head->val, val, val_size);
-    new_head->val_size = val_size;
     new_head->next = list->head;
     list->head = new_head;
     list->size++;
@@ -93,7 +84,6 @@ void LinkedListSet(LinkedList* list, const char* key, const void* val,
             exit(1);
         }
         memcpy(curr->val, val, val_size);
-        curr->val_size = val_size;
     }
 
     list->sorted = 0; // always unsorted after insertion

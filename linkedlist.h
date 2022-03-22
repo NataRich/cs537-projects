@@ -10,7 +10,6 @@ typedef struct __kv_pair
 {
     char* key;
     void* val;
-    size_t val_size;
     struct __kv_pair* next;
 } Node;
 
