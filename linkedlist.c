@@ -13,9 +13,8 @@ LinkedList* LinkedListInit()
     list->size = 0;
     list->sorted = 0;
     list->next = 0;
-    // list->lock = PTHREAD_RWLOCK_INITIALIZER;
     pthread_rwlock_init(&list->lock, NULL);
-    return NULL;
+    return list;
 }
 
 void* LinkedListFind(LinkedList* list, const char* key)
@@ -65,6 +64,7 @@ static void LinkedListAddToHead(LinkedList* list, const char* key,
     new_head->val_size = val_size;
     new_head->next = list->head;
     list->head = new_head;
+    list->size++;
 }
 
 void LinkedListSet(LinkedList* list, const char* key, const void* val, 
@@ -119,9 +119,9 @@ static int compar(const void* node1, const void* node2)
 void LinkedListSort(LinkedList* list)
 {
     pthread_rwlock_wrlock(&list->lock);
-    if (list->sorted == 0)
+    if (list->sorted == 0 && list->size > 0)
     {
-        list->array = (Node**) realloc(list->array, list->size);
+        list->array = (Node**) realloc(list->array, list->size * sizeof(Node*));
         if (list->array == NULL)
         {
             printf("ERROR: realloc failed (linkedlist.sort.1).\n");
@@ -143,14 +143,11 @@ void LinkedListSort(LinkedList* list)
     pthread_rwlock_unlock(&list->lock);
 }
 
-Node* LinkedListNext(LinkedList* list)
+void LinkedListNext(LinkedList* list)
 {
-    Node* node = NULL;
     pthread_rwlock_wrlock(&list->lock);
-    if (list->array != NULL && list->sorted && list->next < list->size)
-        node = list->array[list->next++];
+    list->next++;
     pthread_rwlock_unlock(&list->lock);
-    return node;
 }
 
 Node* LinkedListPeek(LinkedList* list)

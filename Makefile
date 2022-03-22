@@ -10,10 +10,10 @@ OUT=mapreduce
 all: $(OUT)
 
 $(OUT): $(OBJS)
-	$(CC) -o $@ $^ -lpthread
+	$(CC) -o $@ $^ -pthread
 
 %.o: %.c $(DEPS)
-	$(CC) -c $(FLAGS) $< -o $@ -lpthread
+	$(CC) -c $(FLAGS) $< -o $@ -pthread
 
 .PHONY: clean
 clean:

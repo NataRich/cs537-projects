@@ -31,7 +31,7 @@ void LinkedListSet(LinkedList* list, const char* key, const void* val,
 void LinkedListAdd(LinkedList* list, const char* key, const void* val,
                    size_t val_size);
 void LinkedListSort(LinkedList* list);
-Node* LinkedListNext(LinkedList* list);
+void LinkedListNext(LinkedList* list);
 Node* LinkedListPeek(LinkedList* list);
 void LinkedListFree(LinkedList* list);
 

@@ -57,9 +57,12 @@ static void* MR_Map(void* arg)
 
 static char* MR_GetNext(char* key, int partition_number)
 {
-    Node* next = LinkedListNext(cache.partitions[partition_number]);
+    Node* next = LinkedListPeek(cache.partitions[partition_number]);
     if (next != NULL && strcmp(next->key, key) == 0)
+    {
+        LinkedListNext(cache.partitions[partition_number]);
         return next->key;
+    }
     return NULL;
 }
 
@@ -80,7 +83,8 @@ static void* MR_Reduce(void* arg)
 void MR_Emit(char *key, char *value)
 {
     unsigned long partition_number = (*meta.partition)(key, meta.num_reducers);
-    LinkedListAdd(cache.partitions[partition_number], key, value, strlen(value) + 1);
+    size_t val_size = sizeof(char) * (strlen(value) + 1);
+    LinkedListAdd(cache.partitions[partition_number], key, value, val_size);
 }
 
 unsigned long MR_DefaultHashPartition(char *key, int num_partitions)
