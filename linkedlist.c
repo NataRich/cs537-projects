@@ -150,6 +150,15 @@ Node* LinkedListPeek(LinkedList* list)
     return node; 
 }
 
+size_t LinkedListGetSize(LinkedList* list)
+{
+    size_t size;
+    pthread_rwlock_rdlock(&list->lock);
+    size = list->size;
+    pthread_rwlock_rdlock(&list->lock);
+    return size;
+}
+
 void LinkedListFree(LinkedList* list)
 {
     Node* curr = list->head;

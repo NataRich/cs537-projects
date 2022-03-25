@@ -12,7 +12,6 @@ typedef struct __cc_hashmap
 {
     LinkedList** buckets;
     size_t num_buckets;
-    size_t size;
 } HashMap;
 
 // External Functions

@@ -31,7 +31,6 @@ HashMap* MapInit(void)
     for (size_t i = 0; i < N_BUCKETS; i++)
         map->buckets[i] = LinkedListInit();
     map->num_buckets = N_BUCKETS;
-    map->size = 0;
     return map;
 }
 
@@ -47,7 +46,10 @@ char* MapGet(HashMap* map, char* key)
 
 size_t MapSize(HashMap* map)
 {
-    return map->size;
+    size_t size = 0;
+    for (size_t i = 0; i < map->num_buckets; i++)
+        size += LinkedListGetSize(map->buckets[i]);
+    return size;
 }
 
 int resize_map(HashMap* map)

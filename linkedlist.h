@@ -32,6 +32,7 @@ void LinkedListAdd(LinkedList* list, const char* key, const void* val,
 void LinkedListSort(LinkedList* list);
 void LinkedListNext(LinkedList* list);
 Node* LinkedListPeek(LinkedList* list);
+size_t LinkedListGetSize(LinkedList* list);
 void LinkedListFree(LinkedList* list);
 
 
