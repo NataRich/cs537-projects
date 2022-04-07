@@ -281,7 +281,9 @@ wait(void)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      // Add pgdir comparison to ignore child threads instead
+      // of child proesses on wait
+      if(p->parent != curproc || p->pgdir == curproc->pgdir)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -540,6 +542,9 @@ clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   struct proc *np;
   struct proc *curproc = myproc();
 
+  if((uint)stack % PGSIZE != 0) // Check if stack is page-aligned
+    return -1;
+
   if((np = allocproc()) == 0) // Set up kernel stack
     return -1;
 
@@ -585,7 +590,9 @@ join(void **stack)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      // Add pgdir comparison to distinguish child threads
+      // from child processes
+      if(p->parent != curproc || p->pgdir != curproc->pgdir)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
