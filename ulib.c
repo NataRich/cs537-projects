@@ -4,7 +4,19 @@
 #include "user.h"
 #include "x86.h"
 #include "mmu.h"
-#define pagesize 4096
+
+#define MAXTH 32
+
+typedef struct __thread_metadata
+{
+  int idle;
+  void *istack; // Address of pointer to be freed
+  void *ustack; // Actual user stack addrses (DONT FREE)
+                // used as the thread's unique identifier
+} th_meta;
+
+th_meta ths[MAXTH]; // Keep at most 32 threads' info
+
 char*
 strcpy(char *s, const char *t)
 {
@@ -108,20 +120,45 @@ memmove(void *vdst, const void *vsrc, int n)
 
 int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
 {
-  void *stack = malloc(pagesize);
-  return clone(start_routine, arg1, arg2, stack);
+  void *istack = malloc(PGSIZE * 2); // Allocate 2 pages for page-alignment
+  void *ustack = istack;
+  if ((uint)istack % PGSIZE != 0) // Check if page-aligned
+    ustack = istack + (PGSIZE - (uint)istack % PGSIZE);
+
+  // Keep track of thread memory metadata to prevent potential memory leaks
+  // due to page-alignment
+  for(int i = 0; i < MAXTH; i++){
+    th_meta th = ths[i];
+    // Found an available entry to store thread's metadata
+    if (th.idle == 1){
+      th.idle = 0; // Indiate this entry is in use
+      th.istack = istack; // Save the address to be freed later in join
+      th.ustack = ustack; // Save the address as the unique identifier
+      break;
+    }
+  }
+
+  return clone(start_routine, arg1, arg2, ustack);
 }
 
-int thread_join()
+int thread_join(void)
 { 
-  void ** s = 0;
-  int rtn = join(s);//what to pass in as argument?
-  free(*s);//free user stack after join filled its value?
+  void *ustack;
+  int rtn = join(&ustack);
+
+  // Cleanup allocated memory to prevent memory leaks
+  for(int i = 0; i < MAXTH; i++){
+    th_meta th = ths[i];
+    // Found the thread's info
+    if(th.idle == 0 && th.ustack == ustack){
+      th.idle = 1; // Indiate this entry is free to use
+      free(th.istack); // Free unused memory
+      break;
+    }
+  }
+
   return rtn;
 }
-
-//the ticket lock should have multiple functions, like init, acquire, release,
-//and a struct needed.
 
 static inline int FAA(int* variable, int value)
 {
@@ -135,8 +172,8 @@ static inline int FAA(int* variable, int value)
 
 void lock_init(lock_t *lock)
 {
-  lock->ticket=0;
-  lock->turn=0;
+  lock->ticket = 0;
+  lock->turn = 0;
 }
 
 void lock_acquire(lock_t *lock)
@@ -144,10 +181,10 @@ void lock_acquire(lock_t *lock)
   int myturn = FAA(&lock->ticket, 1);
   
   //spin
-  while( FAA(&lock->turn, 0) != myturn );
+  while(lock->turn != myturn);
 }
 
 void lock_release(lock_t *lock)
 {
-  FAA(&lock->turn, 1);
+  lock->turn = lock->turn + 1;
 }
