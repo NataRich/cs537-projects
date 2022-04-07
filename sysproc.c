@@ -98,11 +98,11 @@ sys_clone(void)
   void *stack;
   if (argptr(0, (void*)&fcn, sizeof(*fcn)) < 0)
     return -1;
-  if (argptr(1, &arg1, sizeof(*arg1)) < 0)
+  if (argptr(1, (void*)&arg1, sizeof(*arg1)) < 0)
     return -1;
-  if (argptr(2, &arg2, sizeof(*arg2)) < 0)
+  if (argptr(2, (void*)&arg2, sizeof(*arg2)) < 0)
     return -1;
-  if (argptr(3, &stack, sizeof(*stack)) < 0)
+  if (argptr(3, (void*)&stack, sizeof(*stack)) < 0)
     return -1;
   return clone(fcn, arg1, arg2, stack);
 }
