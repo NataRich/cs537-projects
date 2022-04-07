@@ -39,10 +39,8 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
-
 int thread_create(void(*)(void *, void *), void *, void *);
-int thread_join();
-static inline int FAA(int*, int);
+int thread_join(void);
 void lock_acquire(lock_t *);
 void lock_release(lock_t *);
 void lock_init(lock_t *);
