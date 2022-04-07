@@ -114,7 +114,7 @@ int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
 
 int thread_join()
 { 
-  void ** s;
+  void ** s = 0;
   int rtn = join(s);//what to pass in as argument?
   free(*s);//free user stack after join filled its value?
   return rtn;
