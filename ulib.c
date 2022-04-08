@@ -9,13 +9,13 @@
 
 typedef struct __thread_metadata
 {
-  int idle;
-  void *istack; // Address of pointer to be freed
+  int use; // Default to 0
+  uint offset; // Offset to the address to be freed
   void *ustack; // Actual user stack addrses (DONT FREE)
                 // used as the thread's unique identifier
 } th_meta;
 
-th_meta ths[MAXTH]; // Keep at most 32 threads' info
+th_meta ths[MAXTH] = {{0}}; // Keep at most 32 threads' info
 
 char*
 strcpy(char *s, const char *t)
@@ -122,18 +122,20 @@ int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
 {
   void *istack = malloc(PGSIZE * 2); // Allocate 2 pages for page-alignment
   void *ustack = istack;
+  uint offset = 0;
   if ((uint)istack % PGSIZE != 0) // Check if page-aligned
-    ustack = istack + (PGSIZE - (uint)istack % PGSIZE);
+    offset = PGSIZE - (uint)istack % PGSIZE;
+  ustack += offset;
 
   // Keep track of thread memory metadata to prevent potential memory leaks
   // due to page-alignment
   for(int i = 0; i < MAXTH; i++){
-    th_meta th = ths[i];
+    th_meta *th = &ths[i];
     // Found an available entry to store thread's metadata
-    if (th.idle == 1){
-      th.idle = 0; // Indiate this entry is in use
-      th.istack = istack; // Save the address to be freed later in join
-      th.ustack = ustack; // Save the address as the unique identifier
+    if (th->use == 0){
+      th->use = 1; // Indiate this entry is in use
+      th->offset = offset; // Save the offset to the original address
+      th->ustack = ustack; // Save the address as the unique identifier
       break;
     }
   }
@@ -148,11 +150,11 @@ int thread_join(void)
 
   // Cleanup allocated memory to prevent memory leaks
   for(int i = 0; i < MAXTH; i++){
-    th_meta th = ths[i];
+    th_meta *th = &ths[i];
     // Found the thread's info
-    if(th.idle == 0 && th.ustack == ustack){
-      th.idle = 1; // Indiate this entry is free to use
-      free(th.istack); // Free unused memory
+    if(th->use == 1 && th->ustack == ustack){
+      th->use = 0; // Indiate this entry is free to use
+      free(th->ustack - th->offset); // Free unused memory
       break;
     }
   }
