@@ -12,7 +12,7 @@ int ppid;
 int pid1, pid2, pid3, pid4;
 
 uint running_flag;
-
+lock_t lock;
 #define assert(x) if (x) {} else { \
    printf(1, "%s: %d ", __FILE__, __LINE__); \
    printf(1, "assert failed (%s)\n", # x); \
@@ -28,7 +28,7 @@ main(int argc, char *argv[])
 {
   int i;
   ppid = getpid();
-
+  lock_init(&lock);
   running_flag = 1;
   assert((pid1 = thread_create(consume, NULL, NULL)) > 0);
   assert((pid2 = thread_create(consume, NULL, NULL)) > 0);
@@ -37,16 +37,18 @@ main(int argc, char *argv[])
   
   
   for(i = 0; i < 50; i++) {
-
+    lock_acquire(&lock);
     a+=10;
-
+    lock_release(&lock);
     //printf(1, "produce in main\n");
 
     sleep(10);
   }
   
   sleep(2000);
+  lock_acquire(&lock);
   running_flag = 0;
+  lock_release(&lock);
   sleep(100);
   
   
@@ -68,7 +70,7 @@ consume(void *arg1, void *arg2) {
   sleep(100);
   while(running_flag) {
     //printf(1, "in consume\n");
-
+    lock_acquire(&lock);
 	if (a > 0) {
 		a--;
 
@@ -76,7 +78,7 @@ consume(void *arg1, void *arg2) {
 		b++;
 
 	}
-
+    lock_release(&lock);
   }
 
   //printf(1, "out of consume\n");
