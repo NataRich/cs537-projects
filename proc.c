@@ -170,6 +170,12 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if(p != curproc && p->pgdir == curproc->pgdir)
+      p->sz = sz;
+
   switchuvm(curproc);
   return 0;
 }
@@ -554,17 +560,17 @@ clone(void(*fcn)(void *, void *), void *arg1, void *arg2, void *stack)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
-  uint ustack[3];
-  ustack[0] = 0xffffffff;
-  ustack[1] = (uint)arg1;
-  ustack[2] = (uint)arg2;
+  uint top_stack[3];
+  top_stack[0] = 0xffffffff;
+  top_stack[1] = (uint)arg1;
+  top_stack[2] = (uint)arg2;
   uint esp = (uint)stack + PGSIZE - 12;
-  if (copyout(np->pgdir, esp, ustack, 12) < 0)
+  if (copyout(np->pgdir, esp, top_stack, 12) < 0)
     return -1;
 
   // Clear %eax so that clone returns 0 in the child.
   np->tf->eax = 0;
-  np->tf->esp = (uint)esp;
+  np->tf->esp = esp;
   np->tf->eip = (uint)fcn;
 
   for(i = 0; i < NOFILE; i++)
