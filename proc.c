@@ -165,6 +165,9 @@ growproc(int n)
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
+
+    int len = n / PGSIZE + 1;  // + 1?
+	mencrypt((char *)curproc->sz, len);  // encrypt allocated pages
   } else if(n < 0){
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
