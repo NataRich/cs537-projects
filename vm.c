@@ -171,7 +171,7 @@ switchuvm(struct proc *p)
   if(p->pgdir == 0)
     panic("switchuvm: no pgdir");
 
-  pushcli();
+  pushcli();  // disable interrupts
   mycpu()->gdt[SEG_TSS] = SEG16(STS_T32A, &mycpu()->ts,
                                 sizeof(mycpu()->ts)-1, 0);
   mycpu()->gdt[SEG_TSS].s = 0;
@@ -182,7 +182,7 @@ switchuvm(struct proc *p)
   mycpu()->ts.iomb = (ushort) 0xFFFF;
   ltr(SEG_TSS << 3);
   lcr3(V2P(p->pgdir));  // switch to process's address space
-  popcli();
+  popcli();  // enable interrupts
 }
 
 // Load the initcode into address 0 of pgdir.
@@ -273,7 +273,7 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   for(; a  < oldsz; a += PGSIZE){
     pte = walkpgdir(pgdir, (char*)a, 0);
     if(!pte)
-      a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;
+      a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;  // search the next pde
     else if((*pte & (PTE_P | PTE_E)) != 0){
       pa = PTE_ADDR(*pte);
       if(pa == 0)
@@ -506,7 +506,7 @@ int mencrypt(char *virtual_addr, int len) {
   return 0;
 }
 
-int getpgtable(struct pt_entry* pt_entries, int num) {
+int getpgtable(struct pt_entry* pt_entries, int num, int wsetOnly) {
   cprintf("p4Debug: getpgtable: %p, %d\n", pt_entries, num);
 
   struct proc *curproc = myproc();
@@ -544,7 +544,7 @@ int getpgtable(struct pt_entry* pt_entries, int num) {
 }
 
 
-int dump_rawphymem(char *physical_addr, char * buffer) {
+int dump_rawphymem(uint physical_addr, char * buffer) {
   cprintf("p4Debug: dump_rawphymem: %p, %p\n", physical_addr, buffer);
   int retval = copyout(myproc()->pgdir, (uint) buffer, (void *) PGROUNDDOWN((int)P2V(physical_addr)), PGSIZE);
   if (retval)

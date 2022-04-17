@@ -111,23 +111,26 @@ int sys_mencrypt(void) {
 int sys_getpgtable(void) {
   struct pt_entry * entries; 
   int num;
+  int wsetOnly;
 
+  if(argint(2, &wsetOnly) < 0)
+    return -1;
   if(argint(1, &num) < 0)
     return -1;
   if(argptr(0, (char**)&entries, num*sizeof(struct pt_entry)) < 0){
     return -1;
   }
-  return getpgtable(entries, num);
+  return getpgtable(entries, num, wsetOnly);
 }
 
 
 int sys_dump_rawphymem(void) {
-  char * physical_addr; 
+  uint physical_addr; 
   char * buffer;
 
   if(argptr(1, &buffer, PGSIZE) < 0)
     return -1;
-  if(argint(0, (int*)&physical_addr) < 0)
+  if(argint(0, (int *)&physical_addr) < 0)
     return -1;
   return dump_rawphymem(physical_addr, buffer);
 }

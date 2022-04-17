@@ -190,8 +190,8 @@ int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 //p4Debug : Added new syscalls
 int             mencrypt(char *virtual_addr, int len);
-int             getpgtable(struct pt_entry* entries, int num);
-int             dump_rawphymem(char *physical_addr, char * buffer);
+int             getpgtable(struct pt_entry* entries, int num, int wsetOnly);
+int             dump_rawphymem(uint physical_addr, char * buffer);
 int             mdecrypt(char *virtual_addr);
 
 
