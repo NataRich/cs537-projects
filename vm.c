@@ -361,10 +361,14 @@ uva2ka(pde_t *pgdir, char *uva)
 
   pte = walkpgdir(pgdir, uva, 0);
   // p4Debug: Check for page's present and encrypted flags.
-  if(((*pte & PTE_P) | (*pte & PTE_E)) == 0)
+  if(((*pte & PTE_P) | (*pte & PTE_E)) == 0){
+    cprintf("DEBUG (uva2ka): failed because neither P nor E bit was set\n");
     return 0;
-  if((*pte & PTE_U) == 0)
+  }
+  if((*pte & PTE_U) == 0){
+    cprintf("DEBUG (uva2ka): failed because U bit was not set (kernel only)\n");
     return 0;
+  }
   return (char*)P2V(PTE_ADDR(*pte));
 }
 
@@ -417,10 +421,78 @@ char* translate_and_set(pde_t *pgdir, char *uva) {
   cprintf("p4Debug: PTE was %x and its pointer %p\n", *pte, pte);
   *pte = *pte | PTE_E;
   *pte = *pte & ~PTE_P;
+  *pte = *pte & ~PTE_A;  // Clear ref bit after encryption
   cprintf("p4Debug: PTE is now %x\n", *pte);
   return (char*)P2V(PTE_ADDR(*pte));
 }
 
+static void
+qprint(void)
+{
+  struct proc *p = myproc();
+  for(int i = 0; i < CLOCKSIZE; i++)
+    cprintf("DEBUG (qprint): q[%d] = {%d, %p, %p <- %p}\n", 
+             i, p->q[i].use, p->q[i].uva, p->q[i].pte, *(p->q[i].pte));
+}
+
+// Checks if the page is in the clock queue.
+static int
+qin(pte_t *pte)
+{
+  if(pte == 0)
+    return 0;
+  return (*pte & PTE_P) > 0;
+}
+
+// Pop the head of the clock queue. Move elements forward.
+static struct cnode
+qpop(void)
+{
+  struct proc *p = myproc();
+  struct cnode head = p->q[0];
+  int boundary = CLOCKSIZE - 1;
+  for(int i = 0; i < boundary; i++)
+    p->q[i] = p->q[i + 1];
+  return head;
+}
+
+// Push the pte to the tail of the clock queue.
+static void
+qpush(char *uva, pte_t *pte)
+{
+  struct proc *p = myproc();
+  p->q[CLOCKSIZE - 1].use = 1;
+  p->q[CLOCKSIZE - 1].uva = uva;
+  p->q[CLOCKSIZE - 1].pte = pte;
+}
+
+// Add a pte to the tail of the clock queue. Evict a page if needed.
+static void
+qenq(char *uva, pte_t *pte)
+{
+  struct cnode h = qpop();  // Get the head
+  if(h.use == 0){
+    qpush(uva, pte);
+    return;
+  }
+
+  cprintf("DEBUG (qenq): choosing a victim\n");
+  cprintf("DEBUG (qenq): popped head node {%d, %p, %p <- %p}\n", h.use, h.uva, h.pte, *h.pte);
+  qprint();
+  for(;;){
+    if(!(*h.pte & PTE_A)){
+      qpush(uva, pte);
+      cprintf("DEBUG (qenq): found victim and updated\n");
+      qprint();
+      mencrypt(h.uva, 1);
+      return;
+    }
+
+    *h.pte = *h.pte & ~PTE_A;
+    qpush(h.uva, h.pte);
+    h = qpop();
+  }
+}
 
 int mdecrypt(char *virtual_addr) {
   cprintf("p4Debug:  mdecrypt VPN %d, %p, pid %d\n", PPN(virtual_addr), virtual_addr, myproc()->pid);
@@ -436,6 +508,7 @@ int mdecrypt(char *virtual_addr) {
   cprintf("p4Debug: pte was %x\n", *pte);
   *pte = *pte & ~PTE_E;
   *pte = *pte | PTE_P;
+  *pte = *pte | PTE_A;  // Set ref bit when decryption
   cprintf("p4Debug: pte is %x\n", *pte);
   char * original = uva2ka(mypd, virtual_addr) + OFFSET(virtual_addr);
   cprintf("p4Debug: Original in decrypt was %p\n", original);
@@ -451,6 +524,13 @@ int mdecrypt(char *virtual_addr) {
     *slider = *slider ^ 0xFF;
     slider++;
   }
+
+  // -----------------tentative enqueue-----------------
+  qenq(virtual_addr, pte);
+  cprintf("DEBUG (mdecrypt): finished\n");
+  qprint();
+  // -----------------tentative enqueue-----------------
+
   return 0;
 }
 
@@ -506,6 +586,7 @@ int mencrypt(char *virtual_addr, int len) {
   return 0;
 }
 
+
 int getpgtable(struct pt_entry* pt_entries, int num, int wsetOnly) {
   cprintf("p4Debug: getpgtable: %p, %d\n", pt_entries, num);
 
@@ -517,6 +598,7 @@ int getpgtable(struct pt_entry* pt_entries, int num, int wsetOnly) {
   else 
     uva = PGROUNDDOWN(curproc->sz);
 
+
   int i = 0;
   for (;;uva -=PGSIZE)
   {
@@ -526,6 +608,9 @@ int getpgtable(struct pt_entry* pt_entries, int num, int wsetOnly) {
     if (!(*pte & PTE_U) || !(*pte & (PTE_P | PTE_E)))
       continue;
 
+    if (wsetOnly && !qin(pte))
+      continue;
+    
     pt_entries[i].pdx = PDX(uva);
     pt_entries[i].ptx = PTX(uva);
     pt_entries[i].ppage = *pte >> PTXSHIFT;
@@ -546,6 +631,7 @@ int getpgtable(struct pt_entry* pt_entries, int num, int wsetOnly) {
 
 int dump_rawphymem(uint physical_addr, char * buffer) {
   cprintf("p4Debug: dump_rawphymem: %p, %p\n", physical_addr, buffer);
+  *buffer = *buffer;  // decrypt
   int retval = copyout(myproc()->pgdir, (uint) buffer, (void *) PGROUNDDOWN((int)P2V(physical_addr)), PGSIZE);
   if (retval)
     return -1;
