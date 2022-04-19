@@ -10,6 +10,7 @@
 int
 exec(char *path, char **argv)
 {
+  cprintf("\n\nDEBUG (exec): in exec\n");
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
@@ -60,13 +61,14 @@ exec(char *path, char **argv)
   end_op();
   ip = 0;
 
+
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
-  sp = sz;
+  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));  // Clear the guard page's U bit
+  sp = sz;  // sp grows downward
 
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
@@ -99,7 +101,20 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+
+  // -----------------tentative clock queue init-----------------
+  for(i = 0; i < CLOCKSIZE; i++){
+    curproc->q[i].use = 0;
+    curproc->q[i].uva = 0;
+    curproc->q[i].pte = 0;
+  }
+  // -----------------tentative clock queue init-----------------
+
   switchuvm(curproc);
+  // -----------------tentative encryption-----------------
+  for(uint i = 0; i < sz; i += PGSIZE)
+    mencrypt((char *)i, 1);
+  // -----------------tentative encryption-----------------
   freevm(oldpgdir);
   return 0;
 
