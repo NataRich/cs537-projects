@@ -165,13 +165,15 @@ growproc(int n)
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
-
-    int len = n / PGSIZE + 1;  // + 1?
-	mencrypt((char *)curproc->sz, len);  // encrypt allocated pages
   } else if(n < 0){
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }
+
+  int len = n / PGSIZE;
+  if(mencrypt((char *)PGROUNDUP(sz - n), len))
+    return -1;
+
   curproc->sz = sz;
   switchuvm(curproc);
   return 0;
@@ -214,6 +216,14 @@ fork(void)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+
+  // -----------------tentative clock queue init-----------------
+  for(i = 0; i < CLOCKSIZE; i++){
+    np->q[i].use = curproc->q[i].use;
+    np->q[i].uva = curproc->q[i].uva;
+    np->q[i].pte = curproc->q[i].pte;
+  }
+  // -----------------tentative clock queue init-----------------
 
   acquire(&ptable.lock);
 
