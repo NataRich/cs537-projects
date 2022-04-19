@@ -80,10 +80,11 @@ trap(struct trapframe *tf)
   case T_PGFLT:
     //Food for thought: How can one distinguish between a regular page fault and a decryption request?
     cprintf("p4Debug : Page fault !\n");
+
     addr = (char*)rcr2();
     if (mdecrypt(addr))
     {
-        panic("p4Debug: Memory fault");
+        //panic("p4Debug: Memory fault");
         exit();
     };
     break;
