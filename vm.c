@@ -256,10 +256,14 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   return newsz;
 }
 
-static void
-qrem(pte_t *pte)
+void
+qrem(char *uva)
 {
   struct proc *p = myproc();
+  pte_t *pte = walkpgdir(p->pgdir, uva, 0);
+  if(!pte)
+    return;
+
   int index = -1;
   for(int i = 0; i < CLOCKSIZE; i++)
     if(p->q[i].use && p->q[i].pte == pte){
@@ -269,6 +273,9 @@ qrem(pte_t *pte)
 
   if(index == -1)
     return;
+
+  struct cnode t = p->q[index];
+  mencrypt(t.uva, 1);
 
   for(int i = index; i > 0; i--)
     p->q[i] = p->q[i - 1];
@@ -299,7 +306,6 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
         panic("kfree");
       char *v = P2V(pa);
       kfree(v);
-      qrem(pte);
       *pte = 0;
     }
   }
@@ -496,14 +502,9 @@ qenq(char *uva, pte_t *pte)
     return;
   }
 
-  cprintf("DEBUG (qenq): choosing a victim\n");
-  cprintf("DEBUG (qenq): popped head node {%d, %p, %p <- %p}\n", h.use, h.uva, h.pte, *h.pte);
-  qprint();
   for(;;){
     if(!(*h.pte & PTE_A)){
       qpush(uva, pte);
-      cprintf("DEBUG (qenq): found victim and updated\n");
-      qprint();
       mencrypt(h.uva, 1);
       return;
     }
@@ -550,7 +551,7 @@ int mdecrypt(char *virtual_addr) {
   cprintf("DEBUG (mdecrypt): finished\n");
   qprint();
   // -----------------tentative enqueue-----------------
-
+  switchuvm(p);
   return 0;
 }
 
@@ -650,7 +651,7 @@ int getpgtable(struct pt_entry* pt_entries, int num, int wsetOnly) {
 
 
 int dump_rawphymem(uint physical_addr, char * buffer) {
-  cprintf("p4Debug: dump_rawphymem: %p, %p\n", physical_addr, buffer);
+  //cprintf("p4Debug: dump_rawphymem: %p, %p\n", physical_addr, buffer);
   *buffer = *buffer;  // decrypt
   int retval = copyout(myproc()->pgdir, (uint) buffer, (void *) PGROUNDDOWN((int)P2V(physical_addr)), PGSIZE);
   if (retval)

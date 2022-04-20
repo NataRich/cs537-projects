@@ -193,7 +193,7 @@ int             mencrypt(char *virtual_addr, int len);
 int             getpgtable(struct pt_entry* entries, int num, int wsetOnly);
 int             dump_rawphymem(uint physical_addr, char * buffer);
 int             mdecrypt(char *virtual_addr);
-
+void            qrem(char *pte);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

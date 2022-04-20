@@ -165,14 +165,16 @@ growproc(int n)
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
+
+    int len = n / PGSIZE;
+    if(mencrypt((char *)PGROUNDUP(curproc->sz), len))
+      return -1;
   } else if(n < 0){
     if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
+    for(int uva = PGROUNDDOWN(curproc->sz); uva >= sz; uva -= PGSIZE)
+      qrem((char *)uva);
   }
-
-  int len = n / PGSIZE;
-  if(mencrypt((char *)PGROUNDUP(sz - n), len))
-    return -1;
 
   curproc->sz = sz;
   switchuvm(curproc);
