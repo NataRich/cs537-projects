@@ -256,6 +256,25 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   return newsz;
 }
 
+static void
+qrem(pte_t *pte)
+{
+  struct proc *p = myproc();
+  int index = -1;
+  for(int i = 0; i < CLOCKSIZE; i++)
+    if(p->q[i].use && p->q[i].pte == pte){
+      index = i;
+      break;
+    }
+
+  if(index == -1)
+    return;
+
+  for(int i = index; i > 0; i--)
+    p->q[i] = p->q[i - 1];
+  p->q[0].use = 0;
+}
+
 // Deallocate user pages to bring the process size from oldsz to
 // newsz.  oldsz and newsz need not be page-aligned, nor does newsz
 // need to be less than oldsz.  oldsz can be larger than the actual
@@ -280,6 +299,7 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
         panic("kfree");
       char *v = P2V(pa);
       kfree(v);
+      qrem(pte);
       *pte = 0;
     }
   }
