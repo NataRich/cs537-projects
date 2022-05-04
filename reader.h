@@ -10,9 +10,6 @@
 
 void seek_and_read_block(int fd, off_t offset, void *buffer);
 
-f_jpg *read_jpg_inode(int fd,
-                      struct ext2_inode *inode,
-                      struct ext2_super_block *super,
-                      unsigned int inum);
+f_jpg *read_jpg_inode(int fd, struct ext2_inode *inode, unsigned int inum);
 
 #endif  // READER_H

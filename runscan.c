@@ -25,9 +25,7 @@ void scan_inode_table_multi(int fd, ll_t *out_list) {
   unsigned int inum = 1;
 
   for (unsigned int ngroup = 0; ngroup < num_groups; ngroup++) {
-    struct ext2_super_block super;
     struct ext2_group_desc group;
-    read_super_block(fd, ngroup, &super);
     read_group_desc(fd, ngroup, &group);
 
     off_t start_inode_table = locate_inode_table(ngroup, &group);
@@ -37,7 +35,7 @@ void scan_inode_table_multi(int fd, ll_t *out_list) {
 
       if (S_ISREG(inode->i_mode) && inode->i_size > 0)  // a file with content
         if (test_data_block(fd, BLOCK_OFFSET(inode->i_block[0])))  // a jpg file
-          ll_push(out_list, read_jpg_inode(fd, inode, &super, inum));
+          ll_push(out_list, read_jpg_inode(fd, inode, inum));
 
       free(inode);
     }

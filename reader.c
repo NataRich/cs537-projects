@@ -5,27 +5,29 @@ void seek_and_read_block(int fd, off_t offset, void *buffer) {
   read(fd, buffer, block_size);
 }
 
-void read_direct(struct ext2_inode *inode, unsigned int *n_blocks, f_jpg *jpg) {
-  if (*n_blocks <= 0)
+void read_direct(struct ext2_inode *inode, unsigned int n_blocks, f_jpg *jpg) {
+  if (n_blocks <= 0)
     return;
 
-  unsigned int boundary = *n_blocks;
-  if (boundary > EXT2_NDIR_BLOCKS)
+  unsigned int boundary;
+  if (n_blocks >= EXT2_NDIR_BLOCKS)
     boundary = EXT2_NDIR_BLOCKS;
-  *n_blocks -= boundary;
+  else
+    boundary = n_blocks;
 
   for (unsigned int i = 0; i < boundary; ++i)
     jpg_add_data_block(jpg, inode->i_block[i]);
 }
 
-void read_indirect(int fd, __u32 block_num, unsigned int *n_blocks, f_jpg *jpg) {
-  if (*n_blocks <= 0)
+void read_indirect(int fd, __u32 block_num, unsigned int n_blocks, f_jpg *jpg) {
+  if (n_blocks <= EXT2_NDIR_BLOCKS)
     return;
 
-  unsigned int boundary = *n_blocks;
-  if (boundary > MAX_EXT2_IND_BLOCKS)
+  unsigned int boundary;
+  if (n_blocks >= MAX_EXT2_IND_BLOCKS + EXT2_NDIR_BLOCKS)
     boundary = MAX_EXT2_IND_BLOCKS;
-  *n_blocks -= boundary;
+  else
+    boundary = n_blocks - EXT2_NDIR_BLOCKS;
 
   // read the indirect block and get the block numbers
   __u32 block_nums[MAX_EXT2_IND_BLOCKS];
@@ -37,22 +39,22 @@ void read_indirect(int fd, __u32 block_num, unsigned int *n_blocks, f_jpg *jpg) 
     jpg_add_data_block(jpg, block_nums[i]);
 }
 
-void read_double_indirect(int fd, __u32 block_num, unsigned int *n_blocks, f_jpg *jpg) {
-  if (*n_blocks <= 0)
+void read_double_indirect(int fd, __u32 block_num, unsigned int n_blocks, f_jpg *jpg) {
+  if (n_blocks <= MAX_EXT2_IND_BLOCKS + EXT2_NDIR_BLOCKS)
     return;
 
-  if (*n_blocks > MAX_EXT2_DIND_BLOCKS) {
+  if (n_blocks > MAX_EXT2_DIND_BLOCKS + MAX_EXT2_IND_BLOCKS + EXT2_NDIR_BLOCKS) {
     // remainig data blocks can only be found from the triple indirect block, but for
     // this project, this should not happen
     printf("ERROR: shouldn't need triple indirect\n");
     exit(1);
   }
 
-  unsigned int remaining = *n_blocks % MAX_EXT2_IND_BLOCKS;
-  unsigned int block_boundary = *n_blocks / MAX_EXT2_IND_BLOCKS;
+  n_blocks = n_blocks - MAX_EXT2_IND_BLOCKS - EXT2_NDIR_BLOCKS;
+  unsigned int remaining = n_blocks % MAX_EXT2_IND_BLOCKS;
+  unsigned int block_boundary = n_blocks / MAX_EXT2_IND_BLOCKS;
   if (remaining)
     block_boundary += 1;
-  *n_blocks = 0;
 
   // get destination block numbers from intermediate block
   __u32 dest_block_nums[MAX_EXT2_IND_BLOCKS];
@@ -76,21 +78,21 @@ void read_double_indirect(int fd, __u32 block_num, unsigned int *n_blocks, f_jpg
   }
 }
 
-f_jpg *read_jpg_inode(int fd,
-                      struct ext2_inode *inode,
-                      struct ext2_super_block *super,
-                      unsigned int inum) {
+f_jpg *read_jpg_inode(int fd, struct ext2_inode *inode, unsigned int inum) {
   f_jpg *jpg = jpg_create(inum);
   jpg->inum = inum;
 
   // read data block numbers
-  unsigned int n_blocks = inode->i_blocks / (2 << super->s_log_block_size);
+  unsigned int n_blocks = inode->i_size / block_size;
+  if (inode->i_size % block_size)
+    n_blocks += 1;
+
   // 1) read direct
-  read_direct(inode, &n_blocks, jpg);
+  read_direct(inode, n_blocks, jpg);
   // 2) read indirect
-  read_indirect(fd, inode->i_block[12], &n_blocks, jpg);
+  read_indirect(fd, inode->i_block[12], n_blocks, jpg);
   // 3) read double indirect
-  read_double_indirect(fd, inode->i_block[13], &n_blocks, jpg);
+  read_double_indirect(fd, inode->i_block[13], n_blocks, jpg);
 
   return jpg;
 }
