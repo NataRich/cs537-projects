@@ -12,6 +12,7 @@ typedef struct _jpg_data_ {
     char *filename;
     __u32 *data_blocks;
     size_t block_size;
+    __u32 file_size;
 } f_jpg;
 
 f_jpg *jpg_create(unsigned int inum);

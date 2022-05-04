@@ -81,6 +81,7 @@ void read_double_indirect(int fd, __u32 block_num, unsigned int n_blocks, f_jpg 
 f_jpg *read_jpg_inode(int fd, struct ext2_inode *inode, unsigned int inum) {
   f_jpg *jpg = jpg_create(inum);
   jpg->inum = inum;
+  jpg->file_size = inode->i_size;
 
   // read data block numbers
   unsigned int n_blocks = inode->i_size / block_size;
