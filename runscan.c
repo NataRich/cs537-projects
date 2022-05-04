@@ -3,6 +3,7 @@
 #include "read_ext2.h"
 #include "linkedlist.h"
 #include "reader.h"
+#include "writer.h"
 
 // Returns 1 if it's a jpg, otherwise 0.
 int is_file_jpg(char buffer[1024]) {
@@ -54,6 +55,12 @@ int main(int argc, char *argv[]) {
   ll_t * list = ll_init();
   scan_inode_table_multi(fd, list);
   ll_print(list);
+
+  f_jpg *jpg = NULL;
+  while ((jpg = ll_pop(list)) != NULL) {
+    write_jpg(fd, argv[2], jpg);
+    jpg_free(jpg);
+  }
   ll_free(list);
 
   return 0;
