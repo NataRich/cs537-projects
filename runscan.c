@@ -1,60 +1,62 @@
 #include <stdio.h>
 #include "ext2_fs.h"
 #include "read_ext2.h"
+#include "linkedlist.h"
+#include "reader.h"
 
-int main(int argc, char **argv) {
-	if (argc != 3) {
-		printf("expected usage: ./runscan inputfile outputfile\n");
-		exit(0);
-	}
-	
-	int fd;
+// Returns 1 if it's a jpg, otherwise 0.
+int is_file_jpg(char buffer[1024]) {
+  if (buffer[0] == (char)0xff && buffer[1] == (char)0xd8 && 
+      buffer[2] == (char)0xff && (buffer[3] == (char)0xe0 ||
+      buffer[3] == (char)0xe1 || buffer[3] == (char)0xe8)) {
+    return 1;
+  }
+  return 0;
+}
 
-	fd = open(argv[1], O_RDONLY);    /* open disk image */
+int test_data_block(int fd, off_t offset) {
+  char buffer[1024];
+  seek_and_read_block(fd, offset, (void *)buffer);
+  return is_file_jpg(buffer);
+}
 
-	ext2_read_init(fd);
+// called after ext2_read_init()
+void scan_inode_table_multi(int fd, ll_t *out_list) {
+  unsigned int inum = 1;
 
-	struct ext2_super_block super;
-	struct ext2_group_desc group;
-	
-	// example read first the super-block and group-descriptor
-	read_super_block(fd, 0, &super);
-	read_group_desc(fd, 0, &group);
-	
-	printf("There are %u inodes in an inode table block and %u blocks in the idnode table\n", inodes_per_block, itable_blocks);
-	//iterate the first inode block
-	off_t start_inode_table = locate_inode_table(0, &group);
-    for (unsigned int i = 0; i < inodes_per_block; i++) {
-            printf("inode %u: \n", i);
-            struct ext2_inode *inode = malloc(sizeof(struct ext2_inode));
-            read_inode(fd, 0, start_inode_table, i, inode);
-	    /* the maximum index of the i_block array should be computed from i_blocks / ((1024<<s_log_block_size)/512)
-			 * or once simplified, i_blocks/(2<<s_log_block_size)
-			 * https://www.nongnu.org/ext2-doc/ext2.html#i-blocks
-			 */
-			unsigned int i_blocks = inode->i_blocks/(2<<super.s_log_block_size);
-            printf("number of blocks %u\n", i_blocks);
-             printf("Is directory? %s \n Is Regular file? %s\n",
-                S_ISDIR(inode->i_mode) ? "true" : "false",
-                S_ISREG(inode->i_mode) ? "true" : "false");
-			
-			// print i_block numberss
-			for(unsigned int i=0; i<EXT2_N_BLOCKS; i++)
-			{       if (i < EXT2_NDIR_BLOCKS)                                 /* direct blocks */
-							printf("Block %2u : %u\n", i, inode->i_block[i]);
-					else if (i == EXT2_IND_BLOCK)                             /* single indirect block */
-							printf("Single   : %u\n", inode->i_block[i]);
-					else if (i == EXT2_DIND_BLOCK)                            /* double indirect block */
-							printf("Double   : %u\n", inode->i_block[i]);
-					else if (i == EXT2_TIND_BLOCK)                            /* triple indirect block */
-							printf("Triple   : %u\n", inode->i_block[i]);
+  for (unsigned int ngroup = 0; ngroup < num_groups; ngroup++) {
+    struct ext2_super_block super;
+    struct ext2_group_desc group;
+    read_super_block(fd, ngroup, &super);
+    read_group_desc(fd, ngroup, &group);
 
-			}
-			
-            free(inode);
+    off_t start_inode_table = locate_inode_table(ngroup, &group);
+    for (unsigned int i = 1; i < inodes_per_group; ++i, ++inum) {
+      struct ext2_inode *inode = malloc(sizeof(struct ext2_inode));
+      read_inode(fd, ngroup, start_inode_table, i, inode);
 
-        }
+      if (S_ISREG(inode->i_mode) && inode->i_size > 0)  // a file with content
+        if (test_data_block(fd, BLOCK_OFFSET(inode->i_block[0])))  // a jpg file
+          ll_push(out_list, read_jpg_inode(fd, inode, &super, inum));
 
-	
-	close(fd);
+      free(inode);
+    }
+  }
+}
+
+int main(int argc, char *argv[]) {
+  if (argc != 3) {
+    printf("expected usage: ./runscan inputfile outputfile\n");
+    exit(0);
+  }
+
+  int fd = open(argv[1], O_RDONLY);
+  ext2_read_init(fd);
+
+  ll_t * list = ll_init();
+  scan_inode_table_multi(fd, list);
+  ll_print(list);
+  ll_free(list);
+
+  return 0;
 }
