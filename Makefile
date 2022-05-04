@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror
+CFLAGS = -Wall -Wextra
 DFLAGS = -g
-DEPENDENCIES.C = read_ext2.c
+DEPENDENCIES.C = read_ext2.c linkedlist.c jpg.c reader.c
 EXEC = runscan
 MAIN.C = runscan.c
 
