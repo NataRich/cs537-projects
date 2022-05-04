@@ -5,10 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ext2_fs.h"
+
 typedef struct _jpg_data_ {
     unsigned int inum;
     char *filename;
-    unsigned int *data_blocks;
+    __u32 *data_blocks;
     size_t block_size;
 } f_jpg;
 
@@ -16,7 +18,7 @@ f_jpg *jpg_create(unsigned int inum);
 
 void jpg_add_filename(f_jpg *jpg, const char *name, unsigned char len);
 
-void jpg_add_data_block(f_jpg *jpg, unsigned int bnum);
+void jpg_add_data_block(f_jpg *jpg, __u32 bnum);
 
 void jpg_free(f_jpg *jpg);
 

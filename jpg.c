@@ -36,7 +36,7 @@ void jpg_add_filename(f_jpg *jpg, const char *name, unsigned char len)
     }
 }
 
-void jpg_add_data_block(f_jpg *jpg, unsigned int bnum)
+void jpg_add_data_block(f_jpg *jpg, __u32 bnum)
 {
     if (jpg == NULL)
     {
@@ -44,7 +44,7 @@ void jpg_add_data_block(f_jpg *jpg, unsigned int bnum)
         exit(1);
     }
 
-    size_t size = ++jpg->block_size * sizeof(unsigned int);
+    size_t size = ++jpg->block_size * sizeof(__u32);
     jpg->data_blocks = realloc(jpg->data_blocks, size);
     if (jpg->data_blocks == NULL)
     {
@@ -74,9 +74,9 @@ void jpg_print(f_jpg *jpg)
     {
         printf(" inum: %d\n", jpg->inum);
         printf(" filename: %s\n", jpg->filename);
-        printf(" block size: %d\n", jpg->block_size);
+        printf(" block size: %ld\n", jpg->block_size);
         for (size_t i = 0; i < jpg->block_size; ++i)
-            printf("  block #%d: %d\n", i, jpg->data_blocks[i]);
+            printf("  block #%ld: %d\n", i, jpg->data_blocks[i]);
     }
     else
     {
