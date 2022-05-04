@@ -97,3 +97,21 @@ f_jpg *read_jpg_inode(int fd, struct ext2_inode *inode, unsigned int inum) {
 
   return jpg;
 }
+
+void read_dir_entry(int fd, struct ext2_inode *inode, ll_t *list) {
+  char buffer[1024];
+  // get the offset of the first data block
+  off_t offset = BLOCK_OFFSET(inode->i_block[0]);
+  seek_and_read_block(fd, offset, buffer);
+
+  unsigned int off = 24;
+  while (off < block_size) {
+    struct ext2_dir_entry_2 *entry = (struct ext2_dir_entry_2 *)(buffer + off);
+    if (entry->inode != 0) {
+      f_jpg *jpg = ll_get(list, entry->inode);
+      if (jpg != NULL)
+        jpg_add_filename(jpg, entry->name, entry->name_len & 0xFF);
+    }
+    off += sizeof(struct ext2_dir_entry_2) + ALIGN(entry->name_len);
+  }
+}
